@@ -44,6 +44,7 @@ from apache_beam.typehints import decorators
 from apache_beam.typehints import typecheck
 from apache_beam.typehints import with_input_types
 from apache_beam.typehints import with_output_types
+from apache_beam.transforms.core import CallableWrapperDoFn
 
 decorators._enable_from_callable = True
 
@@ -406,6 +407,23 @@ class RuntimeTypeCheckStatefulDoFnTest(unittest.TestCase):
           | beam.ParDo(_make_stateful_dofn()))
 
       assert_that(result, equal_to([1, 2, 3]))
+
+  def test_wrapper_preserves_bound_method_owner_with_varargs(self):
+    class MethodOwner:
+      pass
+
+    class BoundMethod(MethodOwner):
+      @with_input_types(MethodOwner, int)
+      @with_output_types(int)
+      def process(*args):
+        return [args[-1]]
+
+    dofn = CallableWrapperDoFn(BoundMethod().process)
+
+    wrapper = typecheck.RuntimeTypeCheckWrapperDoFn(
+        dofn, dofn.get_type_hints(), 'MyStep')
+
+    self.assertEqual(list(wrapper.process(1)), [1])
 
 
 if __name__ == '__main__':
